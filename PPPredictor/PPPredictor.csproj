@@ -1,6 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-        <TargetFramework>net48</TargetFramework>
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <CountersPlusPath Condition="Exists('$(MSBuildProjectDirectory)\..\..\CountersPlus\Counters+\bin\Release\net48\Counters+.dll')">$(MSBuildProjectDirectory)\..\..\CountersPlus\Counters+\bin\Release\net48\Counters+.dll</CountersPlusPath>
+    <CountersPlusPath Condition="'$(CountersPlusPath)' == '' AND Exists('$(GameDirectory)\Plugins\Counters+.dll')">$(GameDirectory)\Plugins\Counters+.dll</CountersPlusPath>
+    <CountersPlusPath Condition="'$(CountersPlusPath)' == '' AND Exists('D:\BSManager\BSInstances\1.44.0\Plugins\Counters+.dll')">D:\BSManager\BSInstances\1.44.0\Plugins\Counters+.dll</CountersPlusPath>
         <Configurations>Debug;Release;DEBUG Test;Debug ACCSABERNETWORK;Debug BEATLEADERNETWORK;Debug SCORESABERNETWORK;Debug HITBLOQNETWORK;Debug ALLNETWORK</Configurations>
         <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
@@ -34,6 +37,9 @@
       <Reference Include="BeatmapCore">
         <HintPath>$(GameDirectory)\Beat Saber_Data\Managed\BeatmapCore.dll</HintPath>
       </Reference>
+      <Reference Include="BeatSaber.Multiplayer.Core">
+        <HintPath>$(GameDirectory)\Beat Saber_Data\Managed\BeatSaber.Multiplayer.Core.dll</HintPath>
+      </Reference>
       <Reference Include="BeatSaber.ViewSystem" Publicize="true">
         <HintPath>$(GameDirectory)\Beat Saber_Data\Managed\BeatSaber.ViewSystem.dll</HintPath>
       </Reference>
@@ -50,7 +56,7 @@
         <HintPath>$(GameDirectory)\Plugins\BS_Utils.dll</HintPath>
       </Reference>
       <Reference Include="Counters+">
-        <HintPath>$(GameDirectory)\Plugins\Counters+.dll</HintPath>
+        <HintPath>$(CountersPlusPath)</HintPath>
       </Reference>
       <Reference Include="DataModels">
         <HintPath>$(GameDirectory)\Beat Saber_Data\Managed\DataModels.dll</HintPath>

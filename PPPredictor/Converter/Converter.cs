@@ -6,7 +6,7 @@
         {
             return new Core.DataType.BeatSaberEncapsulation.BeatmapKey
             {
-                serializedName = beatmapKey.beatmapCharacteristic.serializedName,
+                serializedName = beatmapKey.characteristic.SerializedName(),
                 difficulty = GetBeatMapKeyDifficulty(beatmapKey.difficulty)
             };
         }
