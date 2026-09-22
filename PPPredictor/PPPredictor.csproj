@@ -3,7 +3,7 @@
     <TargetFramework>net48</TargetFramework>
     <CountersPlusPath Condition="Exists('$(MSBuildProjectDirectory)\..\..\CountersPlus\Counters+\bin\Release\net48\Counters+.dll')">$(MSBuildProjectDirectory)\..\..\CountersPlus\Counters+\bin\Release\net48\Counters+.dll</CountersPlusPath>
     <CountersPlusPath Condition="'$(CountersPlusPath)' == '' AND Exists('$(GameDirectory)\Plugins\Counters+.dll')">$(GameDirectory)\Plugins\Counters+.dll</CountersPlusPath>
-    <CountersPlusPath Condition="'$(CountersPlusPath)' == '' AND Exists('D:\BSManager\BSInstances\1.44.0\Plugins\Counters+.dll')">D:\BSManager\BSInstances\1.44.0\Plugins\Counters+.dll</CountersPlusPath>
+    <CountersPlusPath Condition="'$(CountersPlusPath)' == '' AND Exists('$(BeatSaberDir)\Plugins\Counters+.dll')">$(BeatSaberDir)\Plugins\Counters+.dll</CountersPlusPath>
         <Configurations>Debug;Release;DEBUG Test;Debug ACCSABERNETWORK;Debug BEATLEADERNETWORK;Debug SCORESABERNETWORK;Debug HITBLOQNETWORK;Debug ALLNETWORK</Configurations>
         <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
