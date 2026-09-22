@@ -104,11 +104,12 @@ namespace PPPredictor
 
         public static void DebugPrint(string text)
         {
-            Plugin.Log?.Error(text);
+            Plugin.Log?.Debug(text);
         }
 
         public static void DebugNetworkPrint(string text, Leaderboard leaderBoard)
         {
+#if SCORESABERNETWORK || BEATLEADERNETWORK || ACCSABERNETWORK || HITBLOQNETWORK
 
             switch (leaderBoard)
             {
@@ -131,7 +132,8 @@ namespace PPPredictor
                 default:
                     return;
             }
-            Plugin.Log?.Error(text);
+            Plugin.Log?.Debug(text);
+#endif
         }
 
         internal static async Task<UserInfo> GetUserInfoBS()
