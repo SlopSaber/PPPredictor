@@ -1,5 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <BeatSaberDir>D:\BSManager\BSInstances\1.45.1</BeatSaberDir>
+    <GameDirectory>$(BeatSaberDir)</GameDirectory>
+    <ImportBSMTTargets>true</ImportBSMTTargets>
+    <BSMTProjectType>BSIPA</BSMTProjectType>
+    <GenerateManifest>false</GenerateManifest>
+    <CopyPDB>false</CopyPDB>
+    <DisableCopyToGame>false</DisableCopyToGame>
     <TargetFramework>net48</TargetFramework>
     <EnableFrameworkPathOverride>true</EnableFrameworkPathOverride>
     <FrameworkPathOverride>$(BeatSaberDir)\Beat Saber_Data\Managed</FrameworkPathOverride>
@@ -163,10 +170,8 @@
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
+      <PackageReference Include="BeatSaberModdingTools.Tasks" Version="2.0.0-beta7" PrivateAssets="all" IncludeAssets="build;contentfiles;analyzers;buildtransitive" />
     </ItemGroup>
-    <Target Name="CopyPlugin" AfterTargets="Build">
-      <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GameDirectory)\Plugins\" SkipUnchangedFiles="false" />
-    </Target>
   <PropertyGroup>
     <Title>PPPredictor</Title>
     <Description>See potential PP of selected map</Description>
