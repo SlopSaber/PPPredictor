@@ -21,7 +21,7 @@ namespace PPPredictor.WebSocket
 
         public void SendData(string s)
         {
-            if (server != null)
+            if (server != null && server.IsListening)
             {
                 server.WebSocketServices["/socket"].Sessions.Broadcast(s);
             }
