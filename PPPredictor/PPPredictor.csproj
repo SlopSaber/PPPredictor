@@ -150,6 +150,8 @@
       <EmbeddedResource Include="UI\Views\PPPredictorView.bsml" />
       <None Remove="UI\Views\SettingsMidView.bsml" />
       <EmbeddedResource Include="UI\Views\SettingsMidView.bsml" />
+      <None Remove="Counter\Settings\CounterSettings.bsml" />
+      <EmbeddedResource Include="Counter\Settings\CounterSettings.bsml" />
       <None Remove="Resources\LeaderBoardLogos\AccSaber.png" />
       <EmbeddedResource Include="Resources\LeaderBoardLogos\AccSaber.png" />
       <None Remove="Resources\LeaderBoardLogos\BeatLeader.png" />
