@@ -511,6 +511,11 @@ namespace PPPredictor.UI.ViewController
 
         private void PpPredictorMgr_ViewActivated(object sender, bool active)
         {
+            if (floatingScreen == null)
+            {
+                return;
+            }
+
             RefreshTabSelection();
             floatingScreen.gameObject.SetActive(active);
             if (active)
