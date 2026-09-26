@@ -37,6 +37,8 @@ namespace PPPredictor.Counter
             gamePlayMgr.OnLastNoteHit -= GamePlayMgr_OnLastNoteHit;
             gamePlayMgr.OnFirstNoteHit -= GamePlayMgr_OnFirstNoteHit;
             gamePlayMgr.OnGameplayInfoChanged -= GamePlayMgr_OnGameplayInfoChanged;
+            foreach (var holder in lsCounterInfoHolder) holder.Dispose();
+            lsCounterInfoHolder.Clear();
         }
 
         #region eventhandler

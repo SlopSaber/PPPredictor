@@ -26,6 +26,9 @@ namespace PPPredictor.UI.ViewController
     {
         private static readonly string githubUrl = "https://github.com/no-1-noob/PPPredictor/releases/latest";
         private FloatingScreen floatingScreen;
+        private Material handleMaterial;
+        private Texture2D handleTexture;
+        private bool disposed;
 #pragma warning disable CS0649
         [Inject] private readonly IPPPredictorMgr ppPredictorMgr;
 #pragma warning restore CS0649
@@ -75,9 +78,16 @@ namespace PPPredictor.UI.ViewController
             MeshRenderer floatingScreenMeshRenderer = floatingScreen.Handle.GetComponent<MeshRenderer>();
             Shader unlitShader = Shader.Find("Sprites/Default");
             var material = new Material(unlitShader);
+            handleMaterial = material;
             floatingScreenMeshRenderer.material = material;
             Texture2D tex = await BeatSaberMarkupLanguage.Utilities.LoadTextureFromAssemblyAsync("PPPredictor.Resources.moveIcon.png");
-            floatingScreenMeshRenderer.material.SetTexture("_MainTex", tex);
+            if (disposed)
+            {
+                if (tex) UnityEngine.Object.Destroy(tex);
+                return;
+            }
+            handleTexture = tex;
+            material.SetTexture("_MainTex", tex);
         }
 
         private void PpPredictorMgr_OnMapPoolRefreshed(object sender, EventArgs e)
@@ -118,9 +128,16 @@ namespace PPPredictor.UI.ViewController
 
         public void Dispose()
         {
+            disposed = true;
             floatingScreen.HandleReleased -= OnScreenHandleReleased;
             ppPredictorMgr.ViewActivated -= PpPredictorMgr_ViewActivated;
+            ppPredictorMgr.OnDataLoading -= PpPredictorMgr_OnDataLoading;
+            ppPredictorMgr.OnDisplayPPInfo -= PpPredictorMgr_OnDisplayPPInfo;
+            ppPredictorMgr.OnDisplaySessionInfo -= PpPredictorMgr_OnDisplaySessionInfo;
+            ppPredictorMgr.OnMapPoolRefreshed -= PpPredictorMgr_OnMapPoolRefreshed;
             if (tabSelector) tabSelector.TextSegmentedControl.didSelectCellEvent -= OnSelectedCellEventChanged;
+            if (handleMaterial) UnityEngine.Object.Destroy(handleMaterial);
+            if (handleTexture) UnityEngine.Object.Destroy(handleTexture);
             Plugin.pppViewController = null;
         }
 #pragma warning disable CS0649

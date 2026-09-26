@@ -31,6 +31,7 @@ namespace PPPredictor.Counter
         private readonly IPPPredictorMgr ppPredictorMgr;
 
         private bool _isPersonalBestAnimationFinished = false;
+        private bool _disposed;
         public Leaderboard Leaderboard { get => leaderboard; }
 
         public CounterInfoHolder(int id, Leaderboard leaderboard, CustomConfigModel settings, IPPPredictorMgr ppPredictorMgr, Canvas canvas, CanvasUtility canvasUtility, float lineOffset, float offsetByLine, float positionScale, LeaderBoardGameplayInfo leaderBoardGameplayInfo) //CHECK WHEN NO C+ is installed??
@@ -208,17 +209,46 @@ namespace PPPredictor.Counter
             {
                 data = await ppPredictorMgr.GetLeaderboardIconData(leaderboard);
             }
+            if (_disposed || !newImage) return;
             if(data == null)
             {
                 var assembly = Assembly.GetExecutingAssembly();
-                System.IO.Stream stream = assembly.GetManifestResourceStream(ppPredictorMgr.GetLeaderboardIcon(leaderboard));
-                data = new byte[stream.Length];
-                stream.Read(data, 0, (int)stream.Length);
+                using (System.IO.Stream stream = assembly.GetManifestResourceStream(ppPredictorMgr.GetLeaderboardIcon(leaderboard)))
+                {
+                    data = new byte[stream.Length];
+                    int offset = 0;
+                    while (offset < data.Length)
+                    {
+                        int count = stream.Read(data, offset, data.Length - offset);
+                        if (count == 0) return;
+                        offset += count;
+                    }
+                }
             }
             Texture2D texture = new Texture2D(1, 1);
-            texture.LoadImage(data);
+            if (!texture.LoadImage(data))
+            {
+                UnityEngine.Object.Destroy(texture);
+                return;
+            }
             texture.Apply();
             newImage.sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Vector2.zero);
+        }
+
+        public void Dispose()
+        {
+            _disposed = true;
+            if (!icon) return;
+            var sprite = icon.sprite;
+            icon.sprite = null;
+            if (sprite)
+            {
+                UnityEngine.Object.Destroy(sprite.texture);
+                UnityEngine.Object.Destroy(sprite);
+            }
+            var material = icon.material;
+            icon.material = null;
+            if (material) UnityEngine.Object.Destroy(material);
         }
 
         internal void MoveIconForLongMaxPP(int digits)
@@ -233,7 +263,7 @@ namespace PPPredictor.Counter
         public async Task StartPersonalBestAnimation(int delay)
         {
             await Task.Delay(delay);
-            if (_isPersonalBestAnimationFinished) return;
+            if (_disposed || _isPersonalBestAnimationFinished) return;
             _isPersonalBestAnimationFinished = true;
             Task t1 = MoveTextWithAnimation(AnimateableCounterText.PP, 100f, new Vector3(-.6f, 0, 0), true, true, true, true);
             Task t2 = MoveTextWithAnimation(AnimateableCounterText.PPGAIN, 100f, new Vector3(-.6f, 0, 0), true, true, !Plugin.ProfileInfo.IsCounterGainSilentModeEnabled, !Plugin.ProfileInfo.IsCounterGainSilentModeEnabled);
@@ -250,15 +280,18 @@ namespace PPPredictor.Counter
         }
         public async Task MoveTextWithAnimation(AnimateableCounterText animateableCounterText, float animationDelayById, Vector3 offset, bool isStartOffset, bool isEaseOut, bool isVisibleAtStart, bool isVisibleAtEnd, Func<bool> cancelRunFuncion = null)
         {
-            if (cancelRunFuncion != null && cancelRunFuncion()) return;
+            if (_disposed || (cancelRunFuncion != null && cancelRunFuncion())) return;
             TMP_Text tmpText = GetTMPText(animateableCounterText);
+            if (!tmpText) return;
             Vector3 originalPPGainPosition = tmpText.transform.position;
             await Task.Delay((int)(animationDelayById * id));
+            if (_disposed || !tmpText) return;
             tmpText.enabled = isVisibleAtStart;
             int steps = 25;
             tmpText.transform.position = isStartOffset ? originalPPGainPosition - offset : originalPPGainPosition;
             for (int i = 0; i < steps; i++)
             {
+                if (_disposed || !tmpText) return;
                 float t = (float)i / (float)steps;
                 if(isEaseOut) t = Mathf.Sin(t * Mathf.PI * 0.5f); //ease out
                 if (!isEaseOut) t = 1f - Mathf.Cos(t * Mathf.PI * 0.5f); //ease in
