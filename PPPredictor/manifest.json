@@ -19,6 +19,7 @@
       "Name": "PPPredictor",
       "Description": "PPPredictor",
       "CounterLocation": "PPPredictor.Counter.PPPCounter",
+      "PreviewLocation": "PPPredictor.Counter.PPPCounterPreview",
       "MultiplayerReady": false,
       "ConfigDefaults": {
         "Enabled": true,
