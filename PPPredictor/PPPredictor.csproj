@@ -1,6 +1,6 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <BeatSaberDir>D:\BSManager\BSInstances\1.45.1</BeatSaberDir>
+    <BeatSaberDir>D:\BSManager\BSInstances\1.45.2</BeatSaberDir>
     <GameDirectory>$(BeatSaberDir)</GameDirectory>
     <ImportBSMTTargets>true</ImportBSMTTargets>
     <BSMTProjectType>BSIPA</BSMTProjectType>
@@ -10,7 +10,6 @@
     <TargetFramework>net48</TargetFramework>
     <EnableFrameworkPathOverride>true</EnableFrameworkPathOverride>
     <FrameworkPathOverride>$(BeatSaberDir)\Beat Saber_Data\Managed</FrameworkPathOverride>
-    <CountersPlusPath Condition="Exists('$(MSBuildProjectDirectory)\..\..\CountersPlus\Counters+\bin\Release\net48\Counters+.dll')">$(MSBuildProjectDirectory)\..\..\CountersPlus\Counters+\bin\Release\net48\Counters+.dll</CountersPlusPath>
     <CountersPlusPath Condition="'$(CountersPlusPath)' == '' AND Exists('$(GameDirectory)\Plugins\Counters+.dll')">$(GameDirectory)\Plugins\Counters+.dll</CountersPlusPath>
     <CountersPlusPath Condition="'$(CountersPlusPath)' == '' AND Exists('$(BeatSaberDir)\Plugins\Counters+.dll')">$(BeatSaberDir)\Plugins\Counters+.dll</CountersPlusPath>
         <Configurations>Debug;Release;DEBUG Test;Debug ACCSABERNETWORK;Debug BEATLEADERNETWORK;Debug SCORESABERNETWORK;Debug HITBLOQNETWORK;Debug ALLNETWORK</Configurations>

@@ -1,4 +1,4 @@
 [submodule "PPPredictor.Core"]
 	path = PPPredictor.Core
-	url = https://github.com/no-1-noob/PPPredictor.Core.git
-	branch = coreinit
+	url = https://github.com/SlopSaber/PPPredictor.Core.git
+	branch = beat-saber-1.45.2
