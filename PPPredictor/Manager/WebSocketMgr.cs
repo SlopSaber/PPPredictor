@@ -3,6 +3,7 @@ using PPPredictor.Data;
 using PPPredictor.Interfaces;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Zenject;
 using static PPPredictor.Core.DataType.Enums;
@@ -14,6 +15,9 @@ namespace PPPredictor.WebSocket
         private readonly IPPPredictorMgr _ppPredictorMgr;
         private List<IPPPWebSocket> _lsWebSockets = new List<IPPPWebSocket>();
         private Dictionary<string, Task> dctWaitingRefresh = new Dictionary<string, Task>();
+        private CancellationTokenSource refreshCancellation = new CancellationTokenSource();
+        private long refreshRevision;
+        private bool disposed;
 
         internal WebSocketOverlayServer OverlayServer;
 
@@ -25,6 +29,7 @@ namespace PPPredictor.WebSocket
 
         public void CreateScoreWebSockets()
         {
+            if (disposed) return;
             if (Plugin.ProfileInfo.IsScoreSaberEnabled)
             {
                 PPPWebSocket<PPPWsScoreSaberCommand> socket = new PPPWebSocket<PPPWsScoreSaberCommand>("wss://scoresaber.com/ws", Leaderboard.ScoreSaber.ToString());
@@ -41,6 +46,7 @@ namespace PPPredictor.WebSocket
 
         private void PPPWebsocket_OnScoreSet(object sender, PPPScoreSetData data)
         {
+            if (disposed || !_lsWebSockets.Contains(sender as IPPPWebSocket)) return;
             _ppPredictorMgr.ScoreSet(data.leaderboardName, data);
             if (Plugin.ProfileInfo.IsHitBloqEnabled)
             {
@@ -50,18 +56,31 @@ namespace PPPredictor.WebSocket
 
         private void AddDelayedRefresh(Leaderboard leaderboard, PPPScoreSetData data)
         {
+            if (disposed || refreshCancellation == null) return;
             string key = $"{leaderboard}_{data.hash}";
             if (!dctWaitingRefresh.ContainsKey(key))
             {
-                dctWaitingRefresh.Add(key, Task.Run(async () => await WaitForRefresh(leaderboard, data)));
+                dctWaitingRefresh.Add(key, WaitForRefresh(leaderboard, data, key, refreshRevision, refreshCancellation.Token));
             }
         }
 
-        private async Task WaitForRefresh(Leaderboard leaderboard, PPPScoreSetData data)
+        private async Task WaitForRefresh(Leaderboard leaderboard, PPPScoreSetData data, string key,
+            long revision, CancellationToken cancellation)
         {
-            await Task.Delay(5000);
-            _ppPredictorMgr.ScoreSet(leaderboard.ToString(), data);
-            dctWaitingRefresh.Remove(data.hash);
+            try
+            {
+                await Task.Delay(5000, cancellation);
+                if (!disposed && revision == refreshRevision)
+                    _ppPredictorMgr.ScoreSet(leaderboard.ToString(), data);
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+            }
+            finally
+            {
+                if (revision == refreshRevision)
+                    dctWaitingRefresh.Remove(key);
+            }
         }
 
         internal void RestartOverlayServer()
@@ -74,12 +93,19 @@ namespace PPPredictor.WebSocket
         #region init dispose
         public void Dispose()
         {
+            if (disposed) return;
+            disposed = true;
             OverlayServer.CloseSocket();
             CloseScoreWebSockets();
         }
 
         public void CloseScoreWebSockets()
         {
+            refreshRevision++;
+            refreshCancellation?.Cancel();
+            refreshCancellation?.Dispose();
+            refreshCancellation = disposed ? null : new CancellationTokenSource();
+            dctWaitingRefresh.Clear();
             foreach (var socket in _lsWebSockets)
             {
                 socket.StopWebSocket();
