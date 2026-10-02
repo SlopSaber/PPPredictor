@@ -1,4 +1,3 @@
-﻿using Newtonsoft.Json;
 using PPPredictor.Core.DataType;
 using PPPredictor.Data;
 using PPPredictor.Interfaces;
@@ -296,13 +295,13 @@ namespace PPPredictor.Utilities
                 lsSimplifiedData.Add(new SimplifiedData(item));
             }
             MessageContainer message = new MessageContainer() { messageType = "OnGameplayInfoChanged", payload= lsSimplifiedData };
-            ppPredictorMgr.WebsocketMgr.OverlayServer.SendData(JsonConvert.SerializeObject(message));
+            ppPredictorMgr.WebsocketMgr.OverlayServer.SendData(message);
         }
 
         private void SendOverlayEvent(string type)
         {
             MessageContainer message = new MessageContainer() { messageType = type};
-            ppPredictorMgr.WebsocketMgr.OverlayServer.SendData(JsonConvert.SerializeObject(message));
+            ppPredictorMgr.WebsocketMgr.OverlayServer.SendData(message);
         }
         #endregion
     }

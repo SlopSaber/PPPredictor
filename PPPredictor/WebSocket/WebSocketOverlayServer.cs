@@ -1,65 +1,39 @@
 ﻿using WebSocketSharp;
 using WebSocketSharp.Server;
-using System;
+using Newtonsoft.Json;
+using PPPredictor.Utilities;
+using System.Threading;
 
 namespace PPPredictor.WebSocket
 {
     internal class WebSocketOverlayServer
     {
-        private static WebSocketOverlayServer activeServer;
-        private WebSocketServer server;
+        private static long nextIdentifier;
+        private readonly long identifier = Interlocked.Increment(ref nextIdentifier);
 
         public void StartSocket()
         {
-            // AppCore is recreated when Beat Saber applies settings. Its new
-            // manager can start before the old manager is disposed.
-            activeServer?.CloseSocket();
-
-            WebSocketServer nextServer = null;
-            try
-            {
-                nextServer = new WebSocketServer($"ws://localhost:{Plugin.ProfileInfo.StreamOverlayPort}");
-                nextServer.AddWebSocketService<PPPreditorWS>("/socket");
-                nextServer.Start();
-                server = nextServer;
-                activeServer = this;
-            }
-            catch (Exception ex)
-            {
-                try
-                {
-                    nextServer?.Stop();
-                }
-                catch (Exception stopEx)
-                {
-                    Plugin.Log?.Warn($"PPPredictor overlay listener cleanup failed: {stopEx}");
-                }
-                Plugin.Log?.Warn($"PPPredictor overlay listener could not start on port {Plugin.ProfileInfo.StreamOverlayPort}: {ex}");
-            }
+            string port = Plugin.ProfileInfo.StreamOverlayPort.ToString();
+            OverlayTransportWorker.Start(identifier, $"ws://localhost:{port}", port);
         }
 
         public void CloseSocket()
         {
-            WebSocketServer oldServer = server;
-            server = null;
-            if (ReferenceEquals(activeServer, this))
-                activeServer = null;
-            try
-            {
-                oldServer?.Stop();
-            }
-            catch (Exception ex)
-            {
-                Plugin.Log?.Warn($"PPPredictor overlay listener could not stop: {ex}");
-            }
+            OverlayTransportWorker.Stop(identifier);
         }
 
         public void SendData(string s)
         {
-            if (server != null && server.IsListening)
-            {
-                server.WebSocketServices["/socket"].Sessions.Broadcast(s);
-            }
+            OverlayTransportWorker.Send(identifier, s);
+        }
+
+        // The caller transfers its new packet and scalar-only payload list.
+        internal void SendData(MessageContainer message)
+        {
+            if (JsonConvert.DefaultSettings != null)
+                SendData(JsonConvert.SerializeObject(message));
+            else
+                OverlayTransportWorker.Send(identifier, message);
         }
     }
 
