@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Threading.Tasks;
 using static PPPredictor.Core.DataType.Enums;
 
 namespace PPPredictor.Utilities
@@ -42,44 +43,60 @@ namespace PPPredictor.Utilities
         /// Taken from https://stackoverflow.com/questions/1922040/how-to-resize-an-image-c-sharp
         public static byte[] ResizeImage(byte[] data, int width, int height)
         {
-            byte[] output = null;
             try
             {
-                using (var ms = new MemoryStream(data))
-                {
-                    Image img = Image.FromStream(ms);
-                    var destRect = new Rectangle(0, 0, width, height);
-                    var destImage = new Bitmap(width, height);
-
-                    destImage.SetResolution(img.HorizontalResolution, img.VerticalResolution);
-
-                    using (var graphics = System.Drawing.Graphics.FromImage(destImage))
-                    {
-                        graphics.CompositingMode = CompositingMode.SourceCopy;
-                        graphics.CompositingQuality = CompositingQuality.HighQuality;
-                        graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                        graphics.SmoothingMode = SmoothingMode.HighQuality;
-                        graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-
-                        using (var wrapMode = new ImageAttributes())
-                        {
-                            wrapMode.SetWrapMode(System.Drawing.Drawing2D.WrapMode.TileFlipXY);
-                            graphics.DrawImage(img, destRect, 0, 0, img.Width, img.Height, GraphicsUnit.Pixel, wrapMode);
-                        }
-                    }
-
-                    using (var msOut = new MemoryStream())
-                    {
-                        destImage.Save(msOut, destImage.RawFormat);
-                        output = msOut.ToArray();
-                    }
-                }
+                return ResizeImageCore(data, width, height);
             }
             catch (System.Exception ex)
             {
                 Plugin.ErrorPrint($"ResizeImage error {ex.Message}");
             }
-            return output;
+            return null;
+        }
+
+        internal static async Task<byte[]> ResizeImageAsync(byte[] data, int width, int height)
+        {
+            try
+            {
+                return await ImagePreparationWorker.ResizeAsync(data, width, height);
+            }
+            catch (System.Exception ex)
+            {
+                Plugin.ErrorPrint($"ResizeImage error {ex.Message}");
+            }
+            return null;
+        }
+
+        internal static byte[] ResizeImageCore(byte[] data, int width, int height)
+        {
+            using (var ms = new MemoryStream(data))
+            using (var img = Image.FromStream(ms))
+            using (var destImage = new Bitmap(width, height))
+            {
+                var destRect = new Rectangle(0, 0, width, height);
+                destImage.SetResolution(img.HorizontalResolution, img.VerticalResolution);
+
+                using (var graphics = System.Drawing.Graphics.FromImage(destImage))
+                {
+                    graphics.CompositingMode = CompositingMode.SourceCopy;
+                    graphics.CompositingQuality = CompositingQuality.HighQuality;
+                    graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    graphics.SmoothingMode = SmoothingMode.HighQuality;
+                    graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+                    using (var wrapMode = new ImageAttributes())
+                    {
+                        wrapMode.SetWrapMode(System.Drawing.Drawing2D.WrapMode.TileFlipXY);
+                        graphics.DrawImage(img, destRect, 0, 0, img.Width, img.Height, GraphicsUnit.Pixel, wrapMode);
+                    }
+                }
+
+                using (var msOut = new MemoryStream())
+                {
+                    destImage.Save(msOut, destImage.RawFormat);
+                    return msOut.ToArray();
+                }
+            }
         }
     }
 

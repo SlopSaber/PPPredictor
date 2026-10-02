@@ -34,6 +34,10 @@ namespace PPPredictor.Utilities
         private Timer _rankTimer;
         private readonly CalculatorInstance calculatorInstance;
         private PPPMapPoolShort currentMapPool;
+        private long _mapPoolIconRevision;
+        private Task _mapPoolIconLoad;
+        private PPPMapPoolShort _mapPoolIconLoadPool;
+        private long _mapPoolIconLoadRevision;
         private List<PPPMapPoolShort> lsMapPools = new List<PPPMapPoolShort>();
         #endregion
 
@@ -119,6 +123,7 @@ namespace PPPredictor.Utilities
             set
             {
                 bool isCurrentMapPoolChanging = IsCurrentMapPoolChanging(value);
+                _mapPoolIconRevision++;
                 currentMapPool = (PPPMapPoolShort)value;
                 UpdateMapPoolDetails();
                 if (isCurrentMapPoolChanging)
@@ -415,23 +420,40 @@ namespace PPPredictor.Utilities
             }
         }
 
-        public async Task GetMapPoolIconData()
+        public Task GetMapPoolIconData()
+        {
+            PPPMapPoolShort pool = currentMapPool;
+            long revision = _mapPoolIconRevision;
+            if (_mapPoolIconLoad != null && !_mapPoolIconLoad.IsCompleted
+                && ReferenceEquals(pool, _mapPoolIconLoadPool)
+                && revision == _mapPoolIconLoadRevision)
+                return _mapPoolIconLoad;
+
+            _mapPoolIconLoadPool = pool;
+            _mapPoolIconLoadRevision = revision;
+            _mapPoolIconLoad = LoadMapPoolIconData(pool, MapPoolIcon, revision);
+            return _mapPoolIconLoad;
+        }
+
+        private async Task LoadMapPoolIconData(PPPMapPoolShort pool, string iconUrl, long revision)
         {
             try
             {
                 using (var client = new HttpClient())
                 {
-                    using (var response = await client.GetAsync(MapPoolIcon))
+                    using (var response = await client.GetAsync(iconUrl))
                     {
-                        byte[] rawData = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
-                        byte[] resizedData = DisplayHelper.ResizeImage(rawData, 128, 128);
-                        MapPoolIconData = resizedData;
+                        byte[] rawData = await response.Content.ReadAsByteArrayAsync();
+                        byte[] resizedData = await DisplayHelper.ResizeImageAsync(rawData, 128, 128);
+                        if (revision == _mapPoolIconRevision && ReferenceEquals(pool, currentMapPool)
+                            && string.Equals(iconUrl, MapPoolIcon, StringComparison.Ordinal))
+                            pool.IconData = resizedData;
                     }
                 }
             }
             catch (Exception ex)
             {
-                Plugin.ErrorPrint($"GetMapPoolIconData {MapPoolIcon} Error: {ex.Message}");
+                Plugin.ErrorPrint($"GetMapPoolIconData {iconUrl} Error: {ex.Message}");
             }
         }
 

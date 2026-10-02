@@ -32,6 +32,8 @@ namespace PPPredictor.Utilities
         private bool isMapPoolDropDownActive = true;
         private bool isLeaderboardNavigationActive = false;
         private int _loadingCounter = 0;
+        private bool _disposed;
+        private long _iconRevision;
 
         public event EventHandler<bool> ViewActivated;
         public event EventHandler<bool> OnDataLoading;
@@ -59,6 +61,7 @@ namespace PPPredictor.Utilities
 
         public async Task ResetPredictors(bool isConstructor = false)
         {
+            _iconRevision++;
             RefreshLeaderboardVisibilityByIPAPluginManager();
             _loadingCounter = 0;
             _lsPPPredictor = new List<IPPPredictor>();
@@ -370,13 +373,21 @@ namespace PPPredictor.Utilities
 
         public async Task<byte[]> GetLeaderboardIconData(Leaderboard leaderBoardName)
         {
+            if (_disposed) return null;
             IPPPredictor predictor = _lsPPPredictor.Find(x => x.LeaderBoardName == leaderBoardName.ToString());
             if (predictor != null)
             {
+                object pool = predictor.CurrentMapPool;
+                string iconUrl = predictor.MapPoolIcon;
+                long revision = _iconRevision;
                 if(predictor.MapPoolIconData == null)
                 {
                     await predictor.GetMapPoolIconData();
                 }
+                if (_disposed || revision != _iconRevision || !_lsPPPredictor.Contains(predictor)
+                    || !ReferenceEquals(pool, predictor.CurrentMapPool)
+                    || !string.Equals(iconUrl, predictor.MapPoolIcon, StringComparison.Ordinal))
+                    return null;
                 return predictor.MapPoolIconData;
             }
             return null;
@@ -409,6 +420,8 @@ namespace PPPredictor.Utilities
 
         public void Dispose()
         {
+            _disposed = true;
+            _iconRevision++;
             foreach (IPPPredictor pPPredictor in _lsPPPredictor)
             {
                 pPPredictor.OnDataLoading -= PPPredictor_OnDataLoading;

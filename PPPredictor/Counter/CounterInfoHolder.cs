@@ -5,7 +5,6 @@ using PPPredictor.Interfaces;
 using PPPredictor.Utilities;
 using System;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -204,6 +203,8 @@ namespace PPPredictor.Counter
 
         private async void LoadImage(ImageView newImage, string imageIdent)
         {
+            if (_disposed || !newImage) return;
+            string resourceName = ppPredictorMgr.GetLeaderboardIcon(leaderboard);
             byte[] data = null;
             if (Plugin.ProfileInfo.CounterUseCustomMapPoolIcons && imageIdent.Contains("http"))
             {
@@ -212,18 +213,8 @@ namespace PPPredictor.Counter
             if (_disposed || !newImage) return;
             if(data == null)
             {
-                var assembly = Assembly.GetExecutingAssembly();
-                using (System.IO.Stream stream = assembly.GetManifestResourceStream(ppPredictorMgr.GetLeaderboardIcon(leaderboard)))
-                {
-                    data = new byte[stream.Length];
-                    int offset = 0;
-                    while (offset < data.Length)
-                    {
-                        int count = stream.Read(data, offset, data.Length - offset);
-                        if (count == 0) return;
-                        offset += count;
-                    }
-                }
+                data = await ImagePreparationWorker.ReadResourceAsync(resourceName);
+                if (_disposed || !newImage || data == null) return;
             }
             Texture2D texture = new Texture2D(1, 1);
             if (!texture.LoadImage(data))
