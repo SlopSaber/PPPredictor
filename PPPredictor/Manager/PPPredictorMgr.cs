@@ -34,6 +34,7 @@ namespace PPPredictor.Utilities
         private int _loadingCounter = 0;
         private bool _disposed;
         private long _iconRevision;
+        private long _resetRevision;
 
         public event EventHandler<bool> ViewActivated;
         public event EventHandler<bool> OnDataLoading;
@@ -61,7 +62,10 @@ namespace PPPredictor.Utilities
 
         public async Task ResetPredictors(bool isConstructor = false)
         {
+            if (_disposed) return;
+            long revision = ++_resetRevision;
             _iconRevision++;
+            RetirePredictors();
             RefreshLeaderboardVisibilityByIPAPluginManager();
             _loadingCounter = 0;
             _lsPPPredictor = new List<IPPPredictor>();
@@ -69,14 +73,20 @@ namespace PPPredictor.Utilities
             if (!isConstructor)
             {
                 _websocketMgr.CloseScoreWebSockets();
-                CalculatorInstance.OnMessage -= Logging_OnMessage;
+                if (CalculatorInstance != null) CalculatorInstance.OnMessage -= Logging_OnMessage;
             }
-            songDetails = await SongDetails.Init();
-            CalculatorInstance = await CalculatorInstance.CreateAsync(
-                await Plugin.ProfileInfo.ParseToSetting(),
+            SongDetails initializedSongDetails = await SongDetails.Init();
+            if (_disposed || revision != _resetRevision) return;
+            songDetails = initializedSongDetails;
+            var settings = await Plugin.ProfileInfo.ParseToSetting();
+            if (_disposed || revision != _resetRevision) return;
+            CalculatorInstance initializedCalculator = await CalculatorInstance.CreateAsync(
+                settings,
                 Plugin.ProfileInfo.DctleaderBoardData,
                 (PPPBeatMapInfo beatMapInfo) => ScoreSaberSongCoreLookUp(beatMapInfo)
             );
+            if (_disposed || revision != _resetRevision) return;
+            CalculatorInstance = initializedCalculator;
             CalculatorInstance.OnMessage += Logging_OnMessage;
             if (Plugin.ProfileInfo.IsScoreSaberEnabled) _lsPPPredictor.Add(new PPPredictor(Leaderboard.ScoreSaber, CalculatorInstance));
             if (Plugin.ProfileInfo.IsBeatLeaderEnabled) _lsPPPredictor.Add(new PPPredictor(Leaderboard.BeatLeader, CalculatorInstance));
@@ -124,7 +134,9 @@ namespace PPPredictor.Utilities
             {
                 CurrentPPPredictor.SetActive(true);
             }
+            if (_disposed || revision != _resetRevision) return;
             SetNavigationArrowInteractivity();
+            if (_disposed || revision != _resetRevision) return;
             _websocketMgr.CreateScoreWebSockets();
         }
 
@@ -174,22 +186,26 @@ namespace PPPredictor.Utilities
 
         private void PPPredictor_OnMapPoolRefreshed(object sender, EventArgs e)
         {
+            if (_disposed || !_lsPPPredictor.Contains(sender as IPPPredictor)) return;
             OnMapPoolRefreshed?.Invoke(this, null);
         }
 
         #region event handler
         private void PPPredictor_OnDisplaySessionInfo(object sender, DisplaySessionInfo displaySessionInfo)
         {
+            if (_disposed || !ReferenceEquals(sender, _currentPPPredictor)) return;
             OnDisplaySessionInfo?.Invoke(this, displaySessionInfo);
         }
 
         private void PPPredictor_OnDisplayPPInfo(object sender, DisplayPPInfo displayPPInfo)
         {
+            if (_disposed || !ReferenceEquals(sender, _currentPPPredictor)) return;
             OnDisplayPPInfo?.Invoke(this, displayPPInfo);
         }
 
         private void PPPredictor_OnDataLoading(object sender, bool isDataLoading)
         {
+            if (_disposed || !_lsPPPredictor.Contains(sender as IPPPredictor)) return;
             _loadingCounter = Math.Max(_loadingCounter + (isDataLoading ? +1 : -1), 0);
             if ((isDataLoading && _loadingCounter == 1) || (!isDataLoading && !IsDataLoading()))
             {
@@ -418,17 +434,27 @@ namespace PPPredictor.Utilities
             //throw new NotImplementedException();
         }
 
-        public void Dispose()
+        private void RetirePredictors()
         {
-            _disposed = true;
-            _iconRevision++;
+            if (_lsPPPredictor == null) return;
             foreach (IPPPredictor pPPredictor in _lsPPPredictor)
             {
                 pPPredictor.OnDataLoading -= PPPredictor_OnDataLoading;
                 pPPredictor.OnDisplayPPInfo -= PPPredictor_OnDisplayPPInfo;
                 pPPredictor.OnDisplaySessionInfo -= PPPredictor_OnDisplaySessionInfo;
                 pPPredictor.OnMapPoolRefreshed -= PPPredictor_OnMapPoolRefreshed;
+                (pPPredictor as IDisposable)?.Dispose();
             }
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _resetRevision++;
+            _iconRevision++;
+            RetirePredictors();
+            if (CalculatorInstance != null) CalculatorInstance.OnMessage -= Logging_OnMessage;
             _websocketMgr.Dispose();
         }
 

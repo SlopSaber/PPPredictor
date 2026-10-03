@@ -13,25 +13,30 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using System.Timers;
+using System.Threading;
+using IPA.Utilities.Async;
 using static PPPredictor.Core.DataType.Enums;
 using PPPredictor.Core.DataType.MapPool;
 using SongCore;
 
 namespace PPPredictor.Utilities
 {
-    internal class PPPredictor : IPPPredictor
+    internal class PPPredictor : IPPPredictor, IDisposable
     {
         internal Leaderboard leaderboardName;
         #region internal values
         private float _percentage;
         private PPPBeatMapInfo _currentBeatMapInfo = new PPPBeatMapInfo();
         private bool _rankGainRunning = false;
-        private double _lastPPGainCall = 0;
+        private RankRequest _pendingRankRequest;
         private bool _isActive = false;
         private DisplayPPInfo _ppDisplay = new DisplayPPInfo();
         private PPGainResult _ppGainResult = new PPGainResult();
-        private Timer _rankTimer;
+        private bool _disposed;
+        private long _rankRevision;
+        private CancellationTokenSource _rankDebounceCancellation;
+        private Task _rankDebounceTask;
+        private Task _rankTask;
         private readonly CalculatorInstance calculatorInstance;
         private PPPMapPoolShort currentMapPool;
         private long _mapPoolIconRevision;
@@ -92,11 +97,6 @@ namespace PPPredictor.Utilities
 
             //_ppCalculator.OnMapPoolRefreshed += PPCalculator_OnMapPoolRefreshed;
 
-            _rankTimer = new System.Timers.Timer(500);
-            _rankTimer.Elapsed += OnRankTimerElapsed;
-            _rankTimer.AutoReset = false;
-            _rankTimer.Enabled = false;
-
         }
         #endregion
 
@@ -122,7 +122,10 @@ namespace PPPredictor.Utilities
             get => (object)currentMapPool;
             set
             {
+                if (_disposed) return;
                 bool isCurrentMapPoolChanging = IsCurrentMapPoolChanging(value);
+                if (isCurrentMapPoolChanging || !ReferenceEquals(currentMapPool, value))
+                    InvalidateRankRequests();
                 _mapPoolIconRevision++;
                 currentMapPool = (PPPMapPoolShort)value;
                 UpdateMapPoolDetails();
@@ -183,19 +186,19 @@ namespace PPPredictor.Utilities
         #region event sending
         private void IsDataLoading(bool isDataLoading)
         {
-            OnDataLoading?.Invoke(this, isDataLoading);
+            if (!_disposed) OnDataLoading?.Invoke(this, isDataLoading);
         }
         private void SendDisplayPPInfo(DisplayPPInfo displayPPInfo)
         {
-            if(_isActive) OnDisplayPPInfo?.Invoke(this, displayPPInfo);
+            if (!_disposed && _isActive) OnDisplayPPInfo?.Invoke(this, displayPPInfo);
         }
         private void SendDisplaySessionInfo(DisplaySessionInfo displaySessionInfo)
         {
-            if (_isActive) OnDisplaySessionInfo?.Invoke(this, displaySessionInfo);
+            if (!_disposed && _isActive) OnDisplaySessionInfo?.Invoke(this, displaySessionInfo);
         }
         private void PPCalculator_OnMapPoolRefreshed(object sender, EventArgs e)
         {
-            OnMapPoolRefreshed?.Invoke(this, null);
+            if (!_disposed) OnMapPoolRefreshed?.Invoke(this, null);
         }
         #endregion
         public double CalculatePPatPercentage(double percentage, PPPBeatMapInfo beatMapInfo, bool levelFailed = false, bool levelPaused = false)
@@ -255,7 +258,8 @@ namespace PPPredictor.Utilities
 
         public void CalculatePP()
         {
-            if(currentMapPool == null) return;
+            if (_disposed || currentMapPool == null) return;
+            InvalidateRankRequests();
             if (_currentBeatMapInfo.MaxPP == -1) _currentBeatMapInfo.MaxPP = CalculateMaxPP();
             double pp = CalculatePPatPercentage(_percentage, _currentBeatMapInfo);
             _ppGainResult = calculatorInstance.GetPlayerScorePPGain(leaderboardName, currentMapPool.Id, _currentBeatMapInfo.SelectedMapSearchString, pp);
@@ -272,34 +276,100 @@ namespace PPPredictor.Utilities
             _ppDisplay.PPGain = $"{ppGains:+0.##;-0.##;0}{PPSuffix}";
             _ppDisplay.PPGainDiffColor = DisplayHelper.GetDisplayColor(ppGains, false, true);
 
-            DisplayRankGain(null, _ppDisplay);
-            //Restart rank calculation timer
-            _rankTimer.Stop();
-            _rankTimer.Start();
+            var request = new RankRequest(_rankRevision, currentMapPool, _ppDisplay, _ppGainResult.PpTotal);
+            DisplayRankGain(null, request.Display);
+            if (!IsCurrentRankRequest(request)) return;
+            _rankDebounceCancellation = new CancellationTokenSource();
+            CancellationToken token = _rankDebounceCancellation.Token;
+            Task delay = Task.Delay(500, token);
+            // The owner scheduler also owns continuations after the delay and calculator worker.
+            _rankDebounceTask = UnityMainThreadTaskScheduler.Factory.StartNew(
+                () => DebounceRankAsync(request, token, delay)).Unwrap();
         }
 
-        private async void OnRankTimerElapsed(object sender, ElapsedEventArgs e)
+        private async Task DebounceRankAsync(RankRequest request, CancellationToken token, Task delay)
         {
-            RankGainResult rankGain = new RankGainResult(1, 2, 3, 4);
-            if (_rankGainRunning)
+            try
             {
-                _lastPPGainCall = _ppGainResult.PpTotal;
-                return;
+                await delay;
+                if (token.IsCancellationRequested || !IsCurrentRankRequest(request)) return;
+                if (_rankGainRunning)
+                    _pendingRankRequest = request;
+                else
+                    _rankTask = RunRankRequestsAsync(request);
             }
-            if (_lastPPGainCall == 0)
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                _rankGainRunning = true;
-                rankGain = await calculatorInstance.GetPlayerRankGain(leaderboardName, currentMapPool.Id, _ppGainResult.PpTotal);
+            }
+            catch (Exception ex)
+            {
+                if (IsCurrentRankRequest(request)) Plugin.ErrorPrint($"Rank debounce {ex.Message}");
+            }
+        }
+
+        private async Task RunRankRequestsAsync(RankRequest request)
+        {
+            _rankGainRunning = true;
+            try
+            {
+                while (request != null && !_disposed)
+                {
+                    try
+                    {
+                        RankGainResult result = await calculatorInstance.GetPlayerRankGain(
+                            leaderboardName, request.PoolId, request.PpTotal);
+                        if (IsCurrentRankRequest(request)) DisplayRankGain(result, request.Display);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (IsCurrentRankRequest(request)) Plugin.ErrorPrint($"Rank gain {ex.Message}");
+                    }
+
+                    request = _pendingRankRequest;
+                    _pendingRankRequest = null;
+                    if (request != null && (request.PpTotal <= 0 || !IsCurrentRankRequest(request)))
+                        request = null;
+                }
+            }
+            finally
+            {
                 _rankGainRunning = false;
             }
-            if (_lastPPGainCall > 0)
+        }
+
+        private bool IsCurrentRankRequest(RankRequest request)
+        {
+            return !_disposed && request.Revision == _rankRevision
+                && ReferenceEquals(request.Pool, currentMapPool)
+                && string.Equals(request.PoolId, currentMapPool?.Id, StringComparison.Ordinal)
+                && ReferenceEquals(request.Display, _ppDisplay);
+        }
+
+        private void InvalidateRankRequests()
+        {
+            _rankRevision++;
+            _pendingRankRequest = null;
+            _rankDebounceCancellation?.Cancel();
+            _rankDebounceCancellation?.Dispose();
+            _rankDebounceCancellation = null;
+        }
+
+        private sealed class RankRequest
+        {
+            internal readonly long Revision;
+            internal readonly PPPMapPoolShort Pool;
+            internal readonly string PoolId;
+            internal readonly DisplayPPInfo Display;
+            internal readonly double PpTotal;
+
+            internal RankRequest(long revision, PPPMapPoolShort pool, DisplayPPInfo display, double ppTotal)
             {
-                _rankGainRunning = true;
-                rankGain = await calculatorInstance.GetPlayerRankGain(leaderboardName, currentMapPool.Id, _lastPPGainCall);
-                _rankGainRunning = false;
-                _lastPPGainCall = 0;
+                Revision = revision;
+                Pool = pool;
+                PoolId = pool.Id;
+                Display = display;
+                PpTotal = ppTotal;
             }
-            DisplayRankGain(rankGain, _ppDisplay);
         }
 
         private void DisplayRankGain(RankGainResult rankGainResult, DisplayPPInfo ppDisplay)
@@ -392,6 +462,8 @@ namespace PPPredictor.Utilities
 
         public async void ResetDisplay(bool resetAll)
         {
+            if (_disposed) return;
+            InvalidateRankRequests();
             await UpdateCurrentAndCheckResetSession(resetAll);
             IsDataLoading(true);
             await calculatorInstance.GetPlayerScores(leaderboardName, currentMapPool.Id, 100, 100);
@@ -401,7 +473,9 @@ namespace PPPredictor.Utilities
 
         public void SetActive(bool setActive, bool hasPoolChanged = false)
         {
+            if (_disposed) return;
             if (_isActive && setActive && !hasPoolChanged) return;
+            if (_isActive != setActive || hasPoolChanged) InvalidateRankRequests();
             _isActive = setActive;
             if (setActive || hasPoolChanged)
             {
@@ -460,6 +534,15 @@ namespace PPPredictor.Utilities
         public PPPMapPoolShort FindPoolWithSyncURL(string syncUrl)
         {
             return calculatorInstance.FindPoolWithSyncURL(leaderboardName, syncUrl);
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _isActive = false;
+            _mapPoolIconRevision++;
+            InvalidateRankRequests();
         }
     }
 }
