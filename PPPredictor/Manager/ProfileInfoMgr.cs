@@ -20,11 +20,11 @@ namespace PPPredictor.Utilities
         internal static ProfileInfo LoadProfileInfo()
         {
             ProfileInfo info;
-            if (File.Exists(profilePath))
+            if (ProfileFileWorker.Exists(profilePath))
             {
                 try
                 {
-                    info = JsonConvert.DeserializeObject<ProfileInfo>(File.ReadAllText(profilePath));
+                    info = JsonConvert.DeserializeObject<ProfileInfo>(ProfileFileWorker.Read(profilePath));
                     if (info.ProfileInfoVersion < _profileInfoVersion) info.ResetCachedData(); //If I need to refetch all data because of datastructure changes
                 }
                 catch (Exception ex)
@@ -50,11 +50,12 @@ namespace PPPredictor.Utilities
                 profile.DctleaderBoardData = dctLeaderBoardData;
                 profile.ProfileInfoVersion = _profileInfoVersion;
                 profile.ClearOldMapInfos();
-                File.WriteAllText(profilePath, JsonConvert.SerializeObject(profile, Formatting.Indented, new JsonSerializerSettings
+                string json = JsonConvert.SerializeObject(profile, Formatting.Indented, new JsonSerializerSettings
                 {
                     NullValueHandling = NullValueHandling.Ignore,
                     DefaultValueHandling = DefaultValueHandling.Ignore
-                }));
+                });
+                ProfileFileWorker.Write(profilePath, json);
             }
             catch (Exception ex)
             {
