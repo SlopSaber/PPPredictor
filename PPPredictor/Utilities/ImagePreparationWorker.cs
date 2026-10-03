@@ -11,7 +11,9 @@ namespace PPPredictor.Utilities
         private enum Operation
         {
             Resize,
-            ReadResource
+            ReadResource,
+            ReadPreviewResource,
+            PrewarmPreviewResource
         }
 
         private sealed class Request
@@ -32,9 +34,9 @@ namespace PPPredictor.Utilities
                 this.height = height;
             }
 
-            internal Request(string resourceName)
+            internal Request(string resourceName, Operation operation = Operation.ReadResource)
             {
-                operation = Operation.ReadResource;
+                this.operation = operation;
                 this.resourceName = resourceName;
             }
 
@@ -42,20 +44,45 @@ namespace PPPredictor.Utilities
             {
                 try
                 {
-                    byte[] result = operation == Operation.Resize
-                        ? DisplayHelper.ResizeImageCore(data, width, height)
-                        : ReadResource(resourceName);
+                    byte[] result;
+                    switch (operation)
+                    {
+                        case Operation.Resize:
+                            result = DisplayHelper.ResizeImageCore(data, width, height);
+                            break;
+                        case Operation.ReadPreviewResource:
+                            result = ReadPreviewResourceCore(resourceName, true);
+                            break;
+                        case Operation.PrewarmPreviewResource:
+                            ReadPreviewResourceCore(resourceName, false);
+                            result = null;
+                            break;
+                        default:
+                            result = ReadResource(resourceName);
+                            break;
+                    }
                     Completion.TrySetResult(result);
                 }
                 catch (Exception ex)
                 {
-                    Completion.TrySetException(ex);
+                    if (operation == Operation.PrewarmPreviewResource)
+                        Completion.TrySetResult(null);
+                    else
+                        Completion.TrySetException(ex);
                 }
             }
         }
 
         private static readonly object gate = new object();
         private static readonly Queue<Request> requests = new Queue<Request>();
+        private static readonly string[] previewResourceNames =
+        {
+            "PPPredictor.Resources.LeaderBoardLogos.ScoreSaber.png",
+            "PPPredictor.Resources.LeaderBoardLogos.BeatLeader.png",
+            "PPPredictor.Resources.LeaderBoardLogos.HitBloq.png",
+            "PPPredictor.Resources.LeaderBoardLogos.AccSaber.png"
+        };
+        private static readonly Dictionary<string, byte[]> previewResources = new Dictionary<string, byte[]>();
         private static Task worker;
 
         // The response buffer is exclusively owned until the queued request finishes.
@@ -67,6 +94,21 @@ namespace PPPredictor.Utilities
         internal static Task<byte[]> ReadResourceAsync(string resourceName)
         {
             return Enqueue(new Request(resourceName));
+        }
+
+        internal static void PrewarmPreviewResources()
+        {
+            foreach (string name in previewResourceNames)
+                Enqueue(new Request(name, Operation.PrewarmPreviewResource));
+        }
+
+        internal static byte[] ReadPreviewResource(string resourceName)
+        {
+            Task<byte[]> completion = Enqueue(new Request(resourceName, Operation.ReadPreviewResource));
+            // A completed signal cannot inline the physical resource read on this caller.
+            if (!completion.IsCompleted)
+                ((IAsyncResult)completion).AsyncWaitHandle.WaitOne();
+            return completion.GetAwaiter().GetResult();
         }
 
         private static Task<byte[]> Enqueue(Request request)
@@ -81,6 +123,18 @@ namespace PPPredictor.Utilities
         }
 
         private static void StartWorker()
+        {
+            if (ExecutionContext.IsFlowSuppressed())
+            {
+                ScheduleWorker();
+                return;
+            }
+
+            using (ExecutionContext.SuppressFlow())
+                ScheduleWorker();
+        }
+
+        private static void ScheduleWorker()
         {
             worker = Task.Factory.StartNew(Drain, CancellationToken.None,
                 TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
@@ -115,10 +169,25 @@ namespace PPPredictor.Utilities
             }
         }
 
-        private static byte[] ReadResource(string resourceName)
+        private static byte[] ReadPreviewResourceCore(string resourceName, bool copy)
+        {
+            bool cacheable = Array.IndexOf(previewResourceNames, resourceName) >= 0;
+            byte[] data;
+            if (!cacheable || !previewResources.TryGetValue(resourceName, out data))
+            {
+                data = ReadResource(resourceName, true);
+                if (cacheable && data != null)
+                    previewResources[resourceName] = data;
+            }
+            return data == null || !copy ? null : (byte[])data.Clone();
+        }
+
+        private static byte[] ReadResource(string resourceName, bool optional = false)
         {
             using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
             {
+                if (stream == null && optional)
+                    return null;
                 byte[] data = new byte[stream.Length];
                 int offset = 0;
                 while (offset < data.Length)

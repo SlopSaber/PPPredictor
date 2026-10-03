@@ -3,9 +3,7 @@ using HMUI;
 using PPPredictor.Utilities;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Reflection;
 using TMPro;
 using UnityEngine;
 using static PPPredictor.Core.DataType.Enums;
@@ -107,20 +105,8 @@ namespace PPPredictor.Counter
         private static void AddIcon(CounterPreviewContext preview, Canvas canvas, Leaderboard board, float positionScale, float centerOffset, float y)
         {
             string resource = $"PPPredictor.Resources.LeaderBoardLogos.{board}.png";
-            Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resource);
-            if (stream == null) return;
-            byte[] data;
-            using (stream)
-            {
-                data = new byte[stream.Length];
-                int offset = 0;
-                while (offset < data.Length)
-                {
-                    int count = stream.Read(data, offset, data.Length - offset);
-                    if (count == 0) return;
-                    offset += count;
-                }
-            }
+            byte[] data = ImagePreparationWorker.ReadPreviewResource(resource);
+            if (data == null) return;
 
             Texture2D texture = new Texture2D(1, 1);
             preview.Track(texture);

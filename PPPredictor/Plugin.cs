@@ -56,6 +56,7 @@ namespace PPPredictor
         public void OnApplicationStart()
         {
             ApplyHarmonyPatches();
+            ImagePreparationWorker.PrewarmPreviewResources();
         }
 
         private static void ApplyHarmonyPatches()
