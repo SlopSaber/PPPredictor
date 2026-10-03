@@ -327,7 +327,7 @@ namespace PPPredictor.Utilities
 
                     request = _pendingRankRequest;
                     _pendingRankRequest = null;
-                    if (request != null && (request.PpTotal <= 0 || !IsCurrentRankRequest(request)))
+                    if (request != null && (!(request.PpTotal > 0) || !IsCurrentRankRequest(request)))
                         request = null;
                 }
             }
