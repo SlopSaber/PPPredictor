@@ -50,7 +50,7 @@ namespace PPPredictor.Utilities
                 profile.DctleaderBoardData = dctLeaderBoardData;
                 profile.ProfileInfoVersion = _profileInfoVersion;
                 profile.ClearOldMapInfos();
-                string json = JsonConvert.SerializeObject(profile, Formatting.Indented, new JsonSerializerSettings
+                string json = ProfileJsonTextWorker.Serialize(profile, Formatting.Indented, new JsonSerializerSettings
                 {
                     NullValueHandling = NullValueHandling.Ignore,
                     DefaultValueHandling = DefaultValueHandling.Ignore
