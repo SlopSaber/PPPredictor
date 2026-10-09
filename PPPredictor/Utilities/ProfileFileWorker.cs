@@ -1,4 +1,5 @@
 using System;
+using PPPredictor.Data;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.ExceptionServices;
@@ -9,11 +10,24 @@ namespace PPPredictor.Utilities
 {
     internal static class ProfileFileWorker
     {
+        internal readonly struct CacheDatePair
+        {
+            internal readonly DateTime fetchTime;
+            internal readonly DateTime now;
+
+            internal CacheDatePair(DateTime fetchTime, DateTime now)
+            {
+                this.fetchTime = fetchTime;
+                this.now = now;
+            }
+        }
+
         private enum Operation
         {
             Exists,
             Read,
-            Write
+            Write,
+            PrepareCache
         }
 
         private sealed class Request
@@ -22,6 +36,8 @@ namespace PPPredictor.Utilities
             internal readonly string path;
             internal readonly string text;
             internal readonly long version;
+            internal readonly CacheDatePair[] cacheDates;
+            internal readonly int cacheCount;
             internal readonly TaskCompletionSource<Result> completion;
 
             internal Request(Operation operation, string path, string text, long version)
@@ -32,6 +48,13 @@ namespace PPPredictor.Utilities
                 this.version = version;
                 completion = new TaskCompletionSource<Result>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
+
+            internal Request(CacheDatePair[] dates, int count, long version)
+                : this(Operation.PrepareCache, null, null, version)
+            {
+                cacheDates = dates;
+                cacheCount = count;
+            }
         }
 
         private sealed class Result
@@ -40,6 +63,7 @@ namespace PPPredictor.Utilities
             internal bool exists;
             internal string text;
             internal Exception error;
+            internal bool[] cacheKeep;
 
             internal Result(long version)
             {
@@ -65,6 +89,19 @@ namespace PPPredictor.Utilities
         internal static void Write(string path, string ownedText)
         {
             Complete(Queue(Operation.Write, path, ownedText));
+        }
+
+        internal static bool[] PrepareCache(CacheDatePair[] ownedDates, int count)
+        {
+            Request request;
+            lock (gate)
+            {
+                request = new Request(ownedDates, count, ++nextVersion);
+                requests.Enqueue(request);
+                if (worker == null)
+                    StartWorker();
+            }
+            return Complete(request).cacheKeep;
         }
 
         private static Request Queue(Operation operation, string path, string text = null)
@@ -124,6 +161,15 @@ namespace PPPredictor.Utilities
                             break;
                         case Operation.Write:
                             File.WriteAllText(request.path, request.text);
+                            break;
+                        case Operation.PrepareCache:
+                            result.cacheKeep = new bool[request.cacheCount];
+                            for (int index = 0; index < request.cacheCount; index++)
+                            {
+                                CacheDatePair pair = request.cacheDates[index];
+                                result.cacheKeep[index] = pair.fetchTime >
+                                    pair.now.AddDays(ProfileInfo.RefetchMapInfoAfterDays);
+                            }
                             break;
                     }
                 }

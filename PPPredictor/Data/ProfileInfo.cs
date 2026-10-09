@@ -141,7 +141,10 @@ namespace PPPredictor.Data
             {
                 foreach (PPPMapPool mappool in leaderboard.DctMapPool.Values)
                 {
-                    mappool.LsLeaderboadInfo = mappool.LsLeaderboadInfo.Where(x => x.FetchTime > DateTime.Now.AddDays(ProfileInfo.RefetchMapInfoAfterDays)).ToList();
+                    List<ShortScore> cached = mappool.LsLeaderboadInfo;
+                    mappool.LsLeaderboadInfo = global::PPPredictor.Utilities.ProfileCachePreparation.TryPrune(cached, out var prepared)
+                        ? prepared
+                        : cached.Where(x => x.FetchTime > DateTime.Now.AddDays(ProfileInfo.RefetchMapInfoAfterDays)).ToList();
                 }
             }
         }
