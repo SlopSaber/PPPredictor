@@ -166,19 +166,15 @@ namespace PPPredictor.UI.ViewController
         {
             float scaleFactor = 0.3f;
             incrementMin.Text = string.Empty;
-            incrementMin.transform.Rotate(0, 0, 90);
-            incrementMin.TextMesh.transform.Rotate(0, 0, -90);
+            incrementMin.transform.localRotation = Quaternion.Euler(0, 0, 90);
+            incrementMin.TextMesh.transform.localRotation = Quaternion.Euler(0, 0, -90);
             incrementMin.transform.localScale = new Vector3(scaleFactor, 1, 1);
             incrementMin.TextMesh.transform.localScale = new Vector3(1, 1 / scaleFactor, 1);
-            incrementMin.transform.Rotate(0, 0, -7);
-            incrementMin.TextMesh.transform.Rotate(0, 0, 7);
 
-            incrementMax.transform.Rotate(0, 0, 90);
-            incrementMax.TextMesh.transform.Rotate(0, 0, -95);
+            incrementMax.transform.localRotation = Quaternion.Euler(0, 0, 90);
+            incrementMax.TextMesh.transform.localRotation = Quaternion.Euler(0, 0, -90);
             incrementMax.transform.localScale = new Vector3(scaleFactor, 1, 1);
             incrementMax.TextMesh.transform.localScale = new Vector3(1, 1 / scaleFactor, 1);
-            incrementMax.transform.Rotate(0, 0, -7);
-            incrementMax.TextMesh.transform.Rotate(0, 0, 7);
 
             sliderFine.transform.localScale = new Vector3(.85f, 1, 1);
             sliderFine.transform.Translate(new Vector3(1, 2, 0));
