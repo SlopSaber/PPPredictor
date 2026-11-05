@@ -9,6 +9,8 @@ namespace PPPredictor.HarmonyPatches
     [HarmonyLib.HarmonyPatch]
     static class HarmonyPatch
     {
+        // Instance ID of the PPPredictor floating screen; 0 until it exists.
+        internal static int FloatingScreenId;
 
         /// <summary>
         /// Prefix for the GenerateTextMesh function.
@@ -21,7 +23,7 @@ namespace PPPredictor.HarmonyPatches
         {
             CurvedCanvasSettings curvedCanvasSettings = __instance._curvedCanvasSettingsHelper.GetCurvedCanvasSettings(__instance.canvas);
             //Only use this logic for the PPPredictor floadingScreen so nothing else can be broken
-            if (curvedCanvasSettings != null && curvedCanvasSettings.name == "BSMLFloatingScreen_PPPredictor")
+            if (FloatingScreenId != 0 && curvedCanvasSettings != null && curvedCanvasSettings.gameObject.GetInstanceID() == FloatingScreenId)
             {
                 OriginalGenerateTextMesh(__instance);
 

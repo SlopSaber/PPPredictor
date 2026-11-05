@@ -52,6 +52,7 @@ namespace PPPredictor.UI.ViewController
             displayPPInfo = new DisplayPPInfo();
             floatingScreen = FloatingScreen.CreateFloatingScreen(new Vector2(75, 100), true, Plugin.ProfileInfo.Position, new Quaternion(0, 0, 0, 0));
             floatingScreen.gameObject.name = "BSMLFloatingScreen_PPPredictor";
+            HarmonyPatches.HarmonyPatch.FloatingScreenId = floatingScreen.gameObject.GetInstanceID();
             floatingScreen.gameObject.SetActive(false);
             floatingScreen.transform.eulerAngles = Plugin.ProfileInfo.EulerAngles;
             floatingScreen.transform.localScale = new Vector3(0.03f, 0.03f, 0.03f);
