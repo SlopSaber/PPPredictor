@@ -91,7 +91,7 @@ namespace PPPredictor.Utilities
         }
         private void OnLevelSelectionDeactivated(bool removedFromHierarchy, bool screenSystemDisabling)
         {
-            RefreshButtonInteraction(true);
+            RefreshButtonInteraction();
             this.ppPredictorMgr.ActivateView(false);
         }
 
@@ -100,21 +100,12 @@ namespace PPPredictor.Utilities
             this.ppPredictorMgr.FindPoolWithSyncURL((lvlPack as PlaylistLevelPack)?.playlist);
         }
 
-        private void RefreshButtonInteraction(bool forceRefresh = false)
+        private void RefreshButtonInteraction()
         {
             //Deactivate Settings while data is loading
             bool isInteractable = !this.ppPredictorMgr.IsDataLoading();
-            if (menuButton.Interactable != isInteractable || forceRefresh)
-            {
-                menuButton.Interactable = isInteractable;
-                _ = RefreshDelay();
-            }
-        }
-
-        private async Task RefreshDelay()
-        {
-            await Task.Delay(250);
-            MenuButtons.Instance.Refresh();
+            // The menu button binds interactable, so the property change updates it without rebuilding the menu.
+            menuButton.Interactable = isInteractable;
         }
 
         /// <summary>
