@@ -34,7 +34,7 @@ namespace PPPredictor.WebSocket
                 webSocket.SslConfiguration.EnabledSslProtocols = System.Security.Authentication.SslProtocols.Tls12;
                 webSocket.OnMessage += WebSocket_OnMessage;
                 webSocket.OnError += WebSocket_OnError;
-                webSocket.Connect();
+                webSocket.ConnectAsync();
             }
             catch (Exception ex)
             {
