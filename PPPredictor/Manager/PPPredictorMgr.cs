@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Zenject;
 using static PPPredictor.Core.DataType.Enums;
@@ -32,6 +33,7 @@ namespace PPPredictor.Utilities
         private bool isMapPoolDropDownActive = true;
         private bool isLeaderboardNavigationActive = false;
         private int _loadingCounter = 0;
+        private readonly object _loadingLock = new object();
 
         public event EventHandler<bool> ViewActivated;
         public event EventHandler<bool> OnDataLoading;
@@ -187,8 +189,14 @@ namespace PPPredictor.Utilities
 
         private void PPPredictor_OnDataLoading(object sender, bool isDataLoading)
         {
-            _loadingCounter = Math.Max(_loadingCounter + (isDataLoading ? +1 : -1), 0);
-            if ((isDataLoading && _loadingCounter == 1) || (!isDataLoading && !IsDataLoading()))
+            // Predictors report from worker threads; keep the count consistent and never negative.
+            int count;
+            lock (_loadingLock)
+            {
+                _loadingCounter = Math.Max(_loadingCounter + (isDataLoading ? +1 : -1), 0);
+                count = _loadingCounter;
+            }
+            if ((isDataLoading && count == 1) || (!isDataLoading && count == 0))
             {
                 OnDataLoading?.Invoke(this, isDataLoading);
             }
@@ -196,7 +204,7 @@ namespace PPPredictor.Utilities
 
         public bool IsDataLoading()
         {
-            return _loadingCounter > 0;
+            return Volatile.Read(ref _loadingCounter) > 0;
         }
         #endregion
 

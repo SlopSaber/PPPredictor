@@ -369,29 +369,59 @@ namespace PPPredictor.Utilities
         {
             await UpdateCurrentAndCheckResetSession(false);
             IsDataLoading(true);
-            await calculatorInstance.GetPlayerScores(leaderboardName, currentMapPool.Id, fetchLength, _leaderboardInfo.LargePageSize, fetchOnePage);
-            if (refreshStars) //MapPool change to a pool that has never been selected before;
+            try
             {
-                await UpdateCurrentBeatMapInfos();
+                await calculatorInstance.GetPlayerScores(leaderboardName, currentMapPool.Id, fetchLength, _leaderboardInfo.LargePageSize, fetchOnePage);
+                if (refreshStars) //MapPool change to a pool that has never been selected before;
+                {
+                    await UpdateCurrentBeatMapInfos();
+                }
+                CalculatePP();
             }
-            CalculatePP();
-            IsDataLoading(false);
+            catch (Exception ex)
+            {
+                Plugin.ErrorPrint($"RefreshCurrentData failed for {leaderboardName}: {ex}");
+            }
+            finally
+            {
+                IsDataLoading(false);
+            }
         }
 
         public async Task UpdateCurrentAndCheckResetSession(bool doResetSession)
         {
             IsDataLoading(true);
-            await DisplaySession(doResetSession);
-            IsDataLoading(false);
+            try
+            {
+                await DisplaySession(doResetSession);
+            }
+            catch (Exception ex)
+            {
+                Plugin.ErrorPrint($"DisplaySession failed for {leaderboardName}: {ex}");
+            }
+            finally
+            {
+                IsDataLoading(false);
+            }
         }
 
         public async void ResetDisplay(bool resetAll)
         {
             await UpdateCurrentAndCheckResetSession(resetAll);
             IsDataLoading(true);
-            await calculatorInstance.GetPlayerScores(leaderboardName, currentMapPool.Id, 100, 100);
-            CalculatePP();
-            IsDataLoading(false);
+            try
+            {
+                await calculatorInstance.GetPlayerScores(leaderboardName, currentMapPool.Id, 100, 100);
+                CalculatePP();
+            }
+            catch (Exception ex)
+            {
+                Plugin.ErrorPrint($"ResetDisplay failed for {leaderboardName}: {ex}");
+            }
+            finally
+            {
+                IsDataLoading(false);
+            }
         }
 
         public void SetActive(bool setActive, bool hasPoolChanged = false)
@@ -410,8 +440,18 @@ namespace PPPredictor.Utilities
             if (currentMapPool != null)
             {
                 IsDataLoading(true);
-                await calculatorInstance.UpdateMapPoolDetails(leaderboardName, currentMapPool.Id);
-                IsDataLoading(false);
+                try
+                {
+                    await calculatorInstance.UpdateMapPoolDetails(leaderboardName, currentMapPool.Id);
+                }
+                catch (Exception ex)
+                {
+                    Plugin.ErrorPrint($"UpdateMapPoolDetails failed for {leaderboardName}: {ex}");
+                }
+                finally
+                {
+                    IsDataLoading(false);
+                }
             }
         }
 
