@@ -1,4 +1,5 @@
-﻿using System;
+﻿using IPA.Utilities.Async;
+using System;
 using Zenject;
 using BeatSaberMarkupLanguage.MenuButtons;
 using BeatSaberPlaylistsLib.Types;
@@ -102,10 +103,9 @@ namespace PPPredictor.Utilities
 
         private void RefreshButtonInteraction()
         {
-            //Deactivate Settings while data is loading
-            bool isInteractable = !this.ppPredictorMgr.IsDataLoading();
-            // The menu button binds interactable, so the property change updates it without rebuilding the menu.
-            menuButton.Interactable = isInteractable;
+            // Deactivate Settings while data is loading. Loading events can arrive from worker threads,
+            // and the bound button may only be updated on the main thread.
+            _ = UnityMainThreadTaskScheduler.Factory.StartNew(() => menuButton.Interactable = !this.ppPredictorMgr.IsDataLoading());
         }
 
         /// <summary>
